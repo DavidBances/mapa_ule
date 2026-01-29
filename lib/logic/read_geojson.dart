@@ -76,16 +76,40 @@ class ReadGeojson {
           geometry.coordinates.lat.toDouble(),
         );
 
-        // Si nos han pasado un polígono, filtramos aquí (en el hilo secundario)
         if (polygon != null) {
           var point = geomFactory.createPoint(coord);
           if (!polygon.covers(point)) {
-            continue; // Si está fuera, lo saltamos
+            continue;
           }
         }
 
         String name = properties?['nombre'] ?? 'Sin nombre';
-        destinations.add(Destination(name: name, coordinate: coord));
+        int floor = properties?['planta'] ?? 0;
+        String type = properties?['tipo'] ?? 'general';
+        String zone = properties?['zona'] ?? 'general';
+        var rawFloors = properties?['plantas_conectadas'];
+        List<int> connectedFloors = [];
+        if (rawFloors != null &&
+            rawFloors.toString() != 'null' &&
+            rawFloors.toString().trim().isNotEmpty) {
+          connectedFloors = rawFloors
+              .toString()
+              .split(',')
+              .map((e) => int.tryParse(e.trim()))
+              .where((e) => e != null)
+              .cast<int>()
+              .toList();
+        }
+        destinations.add(
+          Destination(
+            name: name,
+            coordinate: coord,
+            floor: floor,
+            type: type,
+            zone: zone,
+            connectedFloors: connectedFloors,
+          ),
+        );
       }
     }
     return destinations;

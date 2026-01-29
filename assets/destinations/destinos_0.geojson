@@ -1,0 +1,25 @@
+{
+"type": "FeatureCollection",
+"name": "destinos_0",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "fid": 1, "nombre": "Entrada Principal", "planta": 0, "tipo": "entrada", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561266669235753, 42.613987345337904 ] } },
+{ "type": "Feature", "properties": { "fid": 2, "nombre": "Secretaría", "planta": 0, "tipo": "info", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561301271601719, 42.614109954391047 ] } },
+{ "type": "Feature", "properties": { "fid": 3, "nombre": "Conserjería", "planta": 0, "tipo": "info", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561175797976056, 42.614122775275668 ] } },
+{ "type": "Feature", "properties": { "fid": 4, "nombre": "Baño hombres", "planta": 0, "tipo": "aseo", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561470398675199, 42.61430144213368 ] } },
+{ "type": "Feature", "properties": { "fid": 5, "nombre": "Baño mujeres", "planta": 0, "tipo": "aseo", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561407842083021, 42.614421339038344 ] } },
+{ "type": "Feature", "properties": { "fid": 6, "nombre": "Acceso a la Segunda Fase", "planta": 0, "tipo": "entrada", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561716459944307, 42.614433128298707 ] } },
+{ "type": "Feature", "properties": { "fid": 7, "nombre": "Entrada 3", "planta": 0, "tipo": "entrada", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561493146526901, 42.6145154172739 ] } },
+{ "type": "Feature", "properties": { "fid": 8, "nombre": "Entrada 2", "planta": 0, "tipo": "entrada", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561612973238681, 42.614255346015469 ] } },
+{ "type": "Feature", "properties": { "fid": 9, "nombre": "Aula 4", "planta": 0, "tipo": "aula", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561304115083189, 42.614434425117231 ] } },
+{ "type": "Feature", "properties": { "fid": 10, "nombre": "Aula 3", "planta": 0, "tipo": "aula", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561166346403872, 42.614482996845382 ] } },
+{ "type": "Feature", "properties": { "fid": 11, "nombre": "Aula 2", "planta": 0, "tipo": "aula", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.56090811022822, 42.614414619158957 ] } },
+{ "type": "Feature", "properties": { "fid": 12, "nombre": "Aula 1", "planta": 0, "tipo": "aula", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.560844031772723, 42.614315117701828 ] } },
+{ "type": "Feature", "properties": { "fid": 13, "nombre": "Salón de actos", "planta": 0, "tipo": "salon_actos", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.560647310914349, 42.614160913707728 ] } },
+{ "type": "Feature", "properties": { "fid": 14, "nombre": "Escalera 1", "planta": 0, "tipo": "escalera", "zona": "general", "plantas_conectadas": "0,1" }, "geometry": { "type": "Point", "coordinates": [ -5.561070709309039, 42.614295134866317 ] } },
+{ "type": "Feature", "properties": { "fid": 15, "nombre": "Escalera 2", "planta": 0, "tipo": "escalera", "zona": "general", "plantas_conectadas": "0,1" }, "geometry": { "type": "Point", "coordinates": [ -5.56118380778299, 42.614264482716813 ] } },
+{ "type": "Feature", "properties": { "fid": 16, "nombre": "Zona de ascensores", "planta": 0, "tipo": "ascensor", "zona": "general", "plantas_conectadas": "0,1" }, "geometry": { "type": "Point", "coordinates": [ -5.561125976976907, 42.614277863560858 ] } },
+{ "type": "Feature", "properties": { "fid": 17, "nombre": "Entrada 4", "planta": 0, "tipo": "entrada", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.560976674175598, 42.614575896064586 ] } },
+{ "type": "Feature", "properties": { "fid": 18, "nombre": "Máguinas expendedoras", "planta": 0, "tipo": "restauracion", "zona": "general", "plantas_conectadas": null }, "geometry": { "type": "Point", "coordinates": [ -5.561303414485016, 42.614285248137186 ] } }
+]
+}

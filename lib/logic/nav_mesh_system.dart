@@ -8,77 +8,152 @@ import 'package:mapa_ule/logic/read_geojson.dart';
 class NavMeshSystem {
   final ReadGeojson _lector = ReadGeojson();
 
-  Map<jts.Coordinate, List<jts.Coordinate>> _staticGraph = {};
-  List<Destination> _destinations = [];
-  jts.Polygon? _floorPolygon;
-  jts.GeometryFactory? _geomFactory;
+  final Map<int, Map<jts.Coordinate, List<jts.Coordinate>>> _graphs = {};
+  final List<Destination> _allDestinations = [];
+  final Map<int, jts.Polygon?> _polygons = {};
+  final Map<int, jts.GeometryFactory?> _factories = {};
+  final List<int> floors = [];
 
   Future<void> initialize() async {
-    String jsonNav = await rootBundle.loadString('assets/navmesh.geojson');
-    String jsonDest = await rootBundle.loadString('assets/destinos.geojson');
+    var assetManifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+    int floorNumbers = assetManifest
+        .listAssets()
+        .where((element) => element.startsWith('assets/navmesh/navmesh_'))
+        .length;
 
-    final navData = await _lector.processNavMesh(jsonNav);
-    _staticGraph = navData['graph'];
-    _floorPolygon = navData['polygon'];
-    _geomFactory = navData['factory'];
+    floors.addAll(List.generate(floorNumbers, (index) => index));
 
-    // Pasamos el polígono para que el filtrado se haga en el otro hilo
-    _destinations = await _lector.processDestination(
-      jsonDest,
-      polygon: _floorPolygon,
-      geomFactory: _geomFactory,
-    );
+    for (int i = 0; i < floorNumbers; i++) {
+      String jsonNav = await rootBundle.loadString(
+        'assets/navmesh/navmesh_$i.geojson',
+      );
+      String jsonDest = await rootBundle.loadString(
+        'assets/destinations/destinos_$i.geojson',
+      );
+
+      final navData = await _lector.processNavMesh(jsonNav);
+      _graphs[i] = navData['graph'];
+      _polygons[i] = navData['polygon'];
+      _factories[i] = navData['factory'];
+
+      _allDestinations.addAll(
+        await _lector.processDestination(
+          jsonDest,
+          polygon: _polygons[i],
+          geomFactory: _factories[i],
+        ),
+      );
+    }
   }
 
   Future<List<jts.Coordinate>> obtainRoute(
-    jts.Coordinate start,
-    jts.Coordinate destination,
+    Destination start,
+    Destination destination,
   ) async {
-    final params = {
-      'start': start,
-      'destination': destination,
-      'graph': _staticGraph,
-      'polygon': _floorPolygon,
-      'factory': _geomFactory,
-    };
+    int startFloor = start.floor;
+    int destinationFloor = destination.floor;
+    Map<String, dynamic> params = {};
+    if (startFloor == destinationFloor) {
+      if (start.zone == destination.zone ||
+          start.zone == 'general' ||
+          destination.zone == 'general') {
+        params = {
+          'start': start,
+          'destination': destination,
+          'graph': _graphs[startFloor],
+          'polygon': _polygons[startFloor],
+          'factory': _factories[startFloor],
+        };
+      } else {
+        List<Destination> connectors = obtainConnectorsInSameFloor(
+          startFloor,
+          start.zone,
+          destinationFloor,
+        );
+        if (connectors.isEmpty) {
+          return [];
+        } else {
+          Destination connector = _obtainNearestConnector(start, connectors);
+          params = {
+            'start': start,
+            'destination': connector,
+            'graph': _graphs[startFloor],
+            'polygon': _polygons[startFloor],
+            'factory': _factories[startFloor],
+          };
+        }
+      }
+    }
     return compute(_solveRoute, params);
   }
 
   List<Destination> obtainDestinations() {
-    return _destinations;
+    return _allDestinations.where((d) => !d.isConnector).toList();
   }
 
-  List<List<jts.Coordinate>> getGraphEdges() {
-    List<List<jts.Coordinate>> edges = [];
-    for (var entry in _staticGraph.entries) {
-      var start = entry.key;
-      for (var end in entry.value) {
-        edges.add([start, end]);
+  List<Destination> obtainConnectors() {
+    return _allDestinations.where((d) => d.isConnector).toList();
+  }
+
+  List<int> obtainNumberOfFloors() {
+    return floors;
+  }
+
+  List<Destination> obtainConnectorsInSameFloor(
+    int floor,
+    String zone,
+    int destinationFloor,
+  ) {
+    return _allDestinations
+        .where(
+          (d) =>
+              d.isConnector &&
+              d.floor == floor &&
+              d.zone == zone &&
+              d.connectedFloors.contains(destinationFloor),
+        )
+        .toList();
+  }
+
+  Destination _obtainNearestConnector(
+    Destination point,
+    List<Destination> connectors,
+  ) {
+    Destination nearestConnector = connectors[0];
+    double minDistance = double.infinity;
+    for (Destination connector in connectors) {
+      double distance = point.coordinate.distance(connector.coordinate);
+      if (distance < minDistance) {
+        nearestConnector = connector;
+        minDistance = distance;
       }
     }
-    return edges;
+    return nearestConnector;
   }
 
   // Función pública para ajustar una coordenada al polígono válido más cercano
-  jts.Coordinate getSnappedPoint(jts.Coordinate coord) {
-    if (_floorPolygon == null || _geomFactory == null) return coord;
+  jts.Coordinate getSnappedPoint(jts.Coordinate coord, int floor) {
+    jts.Polygon? floorPolygon = _polygons[floor];
+    jts.GeometryFactory? geomFactory = _factories[floor];
+    if (floorPolygon == null || geomFactory == null) return coord;
 
-    var pointGeom = _geomFactory!.createPoint(coord);
-    if (!_floorPolygon!.covers(pointGeom)) {
-      var op = jts.DistanceOp(pointGeom, _floorPolygon!);
+    var pointGeom = geomFactory.createPoint(coord);
+    if (!floorPolygon.covers(pointGeom)) {
+      var op = jts.DistanceOp(pointGeom, floorPolygon);
       var nearest = op.nearestPoints();
       if (nearest.length > 1) {
-        return nearest[1]; // Devuelve el punto corregido sobre el borde del polígono
+        return nearest[1];
       }
     }
     return coord;
   }
 }
 
-// Función suelta (top-level) o estática para calcular la ruta
 List<jts.Coordinate> _solveRoute(Map<String, dynamic> params) {
-  var start = params['start'] as jts.Coordinate;
-  var destination = params['destination'] as jts.Coordinate;
+  var startDest = params['start'] as Destination;
+  var destinationDest = params['destination'] as Destination;
+  var startCoord = startDest.coordinate;
+  var destinationCoord = destinationDest.coordinate;
   final graph = params['graph'] as Map<jts.Coordinate, List<jts.Coordinate>>;
   final floorPolygon = params['polygon'] as jts.Polygon;
   final geomFactory = params['factory'] as jts.GeometryFactory;
@@ -97,8 +172,8 @@ List<jts.Coordinate> _solveRoute(Map<String, dynamic> params) {
     return coord;
   }
 
-  start = snapToPolygon(start);
-  destination = snapToPolygon(destination);
+  startCoord = snapToPolygon(startCoord);
+  destinationCoord = snapToPolygon(destinationCoord);
 
   bool isVisible(jts.Coordinate p1, jts.Coordinate p2) {
     if (p1.equals2D(p2) || p1.distance(p2) < 0.0000001) {
@@ -116,8 +191,8 @@ List<jts.Coordinate> _solveRoute(Map<String, dynamic> params) {
     }
   }
 
-  if (isVisible(start, destination)) {
-    return [start, destination];
+  if (isVisible(startCoord, destinationCoord)) {
+    return [startCoord, destinationCoord];
   }
 
   var tempGraph = Map.of(graph);
@@ -154,8 +229,8 @@ List<jts.Coordinate> _solveRoute(Map<String, dynamic> params) {
     }
   }
 
-  connectPoint(start);
-  connectPoint(destination);
+  connectPoint(startCoord);
+  connectPoint(destinationCoord);
 
-  return pathFinder.computeRoute(start, destination, tempGraph);
+  return pathFinder.computeRoute(startCoord, destinationCoord, tempGraph);
 }
