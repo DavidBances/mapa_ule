@@ -5,33 +5,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:mapa_ule/models/destination.dart';
 
 class MapUtils {
-  static List<Marker> updateMarkers(
-    Destination? start,
-    Destination? destination,
-  ) {
-    return [
-      if (start != null)
-        Marker(
-          key: const ValueKey('start'),
-          point: LatLng(start.coordinate.y, start.coordinate.x),
-          child: const Icon(Icons.circle, color: Colors.black, size: 15),
-          width: 40,
-          height: 40,
-          rotate: true,
-        ),
-      if (destination != null)
-        Marker(
-          key: const ValueKey('dest'),
-          point: LatLng(destination.coordinate.y, destination.coordinate.x),
-          child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
-          alignment: Alignment.topCenter,
-          width: 40,
-          height: 40,
-          rotate: true,
-        ),
-    ];
-  }
-
   static int calculateDistance(List<jts.Coordinate> route) {
     final Distance distanceCalculator = const Distance();
     double total = 0.0;
@@ -47,12 +20,12 @@ class MapUtils {
     return total.round();
   }
 
-  static String calculateTime(int doubleDistance) {
+  static int calculateTime(int doubleDistance) {
     const double speedMetersperMinute = 70.0;
     double time = doubleDistance / speedMetersperMinute;
     int minutes = time.ceil();
-    if (minutes < 1) return "< 1 min";
-    return "$minutes min";
+    if (minutes < 1) return minutes;
+    return minutes;
   }
 
   static List<Polyline> getRoutePolylines(List<jts.Coordinate> coordinates) {

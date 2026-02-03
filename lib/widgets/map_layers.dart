@@ -4,69 +4,100 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mapa_ule/utils/map_utils.dart';
 
-class MapLayers extends StatelessWidget {
+class MapLayers extends StatefulWidget {
   final List<Marker> markers;
+  final List<Marker> poiMarkers;
+  final List<Marker> labelMarkers;
   final List<jts.Coordinate> route;
   final MapController mapController;
   final int floor;
   final Function(LatLng) onClick;
+  final Function(LatLng) onLongPress;
 
   static final LatLngBounds bounds = LatLngBounds(
-    LatLng(42.614764802, -5.561775800),
-    LatLng(42.613773767, -5.560411363),
+    LatLng(42.613725, -5.561775),
+    LatLng(42.614722, -5.560413),
   );
-
-  static final LatLngBounds limitBounds = LatLngBounds(
-    LatLng(42.6150, -5.5625),
-    LatLng(42.6135, -5.5595),
-  );
-
-  static final LatLng initialCenter = LatLng(42.614434, -5.561000);
 
   const MapLayers({
     super.key,
     required this.markers,
+    required this.poiMarkers,
+    required this.labelMarkers,
     required this.route,
     required this.mapController,
     required this.floor,
     required this.onClick,
+    required this.onLongPress,
   });
 
+  @override
+  State<MapLayers> createState() => _MapLayersState();
+}
+
+class _MapLayersState extends State<MapLayers> {
+  List<Marker> labelMarkersList = [];
   @override
   Widget build(BuildContext context) {
     return drawMap();
   }
 
   FlutterMap drawMap() {
+    var cameraBounds = LatLngBounds(
+      LatLng(
+        MapLayers.bounds.southWest.latitude - 0.002,
+        MapLayers.bounds.southWest.longitude - 0.002,
+      ),
+      LatLng(
+        MapLayers.bounds.northEast.latitude + 0.002,
+        MapLayers.bounds.northEast.longitude + 0.002,
+      ),
+    );
     return FlutterMap(
-      mapController: mapController,
+      mapController: widget.mapController,
       options: MapOptions(
-        initialCenter: initialCenter,
-        //cameraConstraint: CameraConstraint.contain(bounds: limitBounds),
-        minZoom: 10.0,
-        maxZoom: 20.0,
-        initialZoom: 19.0,
+        initialCenter: MapLayers.bounds.center,
+        cameraConstraint: CameraConstraint.contain(bounds: cameraBounds),
+        minZoom: 17.5,
+        maxZoom: 21.0,
+        initialZoom: 18.5,
         onTap: (tapPosition, point) {
-          onClick(point);
+          widget.onClick(point);
+        },
+        onLongPress: (tapPosition, point) {
+          widget.onLongPress(point);
+        },
+        onPositionChanged: (position, hasGesture) {
+          setState(() {
+            position.zoom! > 19.0
+                ? labelMarkersList = widget.labelMarkers
+                : labelMarkersList = [];
+          });
         },
       ),
       children: [
         TileLayer(
           urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          //urlTemplate: 'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
           userAgentPackageName: 'com.david.mapaUle',
         ),
         OverlayImageLayer(
           overlayImages: [
             OverlayImage(
               imageProvider: AssetImage(
-                'assets/images/Planta_${floor}_final.png',
+                'assets/images/Planta_${widget.floor}_final.png',
               ),
-              bounds: bounds,
+              bounds: MapLayers.bounds,
+              opacity: 0.7,
             ),
           ],
         ),
-        PolylineLayer(polylines: MapUtils.getRoutePolylines(route)),
-        MarkerLayer(markers: markers),
+        PolylineLayer(polylines: MapUtils.getRoutePolylines(widget.route)),
+        MarkerLayer(
+          markers: widget.route.isEmpty
+              ? [...widget.poiMarkers, ...widget.markers, ...labelMarkersList]
+              : [...widget.markers, ...labelMarkersList],
+        ),
       ],
     );
   }

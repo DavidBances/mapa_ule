@@ -1,4 +1,5 @@
 import 'package:dart_jts/dart_jts.dart' as jts;
+import 'package:mapa_ule/utils/constants.dart';
 
 class Destination {
   final String name;
@@ -9,15 +10,16 @@ class Destination {
   final List<int> connectedFloors;
 
   Destination({
-    this.name = 'Sin nombre',
+    this.name = AppConstants.defaultName,
     required this.coordinate,
     this.floor = 0,
-    this.type = 'general',
-    this.zone = 'general',
+    this.type = AppConstants.typeGeneral,
+    this.zone = AppConstants.typeGeneral,
     this.connectedFloors = const [],
   });
 
-  bool get isConnector => type == "ascensor" || type == "escalera";
+  bool get isConnector =>
+      type == AppConstants.typeElevator || type == AppConstants.typeStairs;
 
   @override
   String toString() => "$name: [${coordinate.x}, ${coordinate.y}]: $floor";

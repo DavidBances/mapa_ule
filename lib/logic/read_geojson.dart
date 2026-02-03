@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:dart_jts/dart_jts.dart' as jts;
 import 'package:flutter/foundation.dart';
 import 'package:mapa_ule/models/destination.dart';
+import 'package:mapa_ule/utils/constants.dart';
 import 'package:turf/turf.dart';
 
 class ReadGeojson {
@@ -83,10 +84,10 @@ class ReadGeojson {
           }
         }
 
-        String name = properties?['nombre'] ?? 'Sin nombre';
+        String name = properties?['nombre'] ?? AppConstants.defaultName;
         int floor = properties?['planta'] ?? 0;
-        String type = properties?['tipo'] ?? 'general';
-        String zone = properties?['zona'] ?? 'general';
+        String type = properties?['tipo'] ?? AppConstants.typeGeneral;
+        String zone = properties?['zona'] ?? AppConstants.typeGeneral;
         var rawFloors = properties?['plantas_conectadas'];
         List<int> connectedFloors = [];
         if (rawFloors != null &&

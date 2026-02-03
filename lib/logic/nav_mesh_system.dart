@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:mapa_ule/logic/a_star_algorithm.dart';
 import 'package:mapa_ule/models/destination.dart';
 import 'package:mapa_ule/logic/read_geojson.dart';
+import 'package:mapa_ule/utils/constants.dart';
 
 class NavMeshSystem {
   final ReadGeojson _lector = ReadGeojson();
@@ -49,14 +50,15 @@ class NavMeshSystem {
   Future<List<jts.Coordinate>> obtainRoute(
     Destination start,
     Destination destination,
+    bool? useElevator,
   ) async {
     int startFloor = start.floor;
     int destinationFloor = destination.floor;
     Map<String, dynamic> params = {};
     if (startFloor == destinationFloor) {
       if (start.zone == destination.zone ||
-          start.zone == 'general' ||
-          destination.zone == 'general') {
+          start.zone == AppConstants.typeGeneral ||
+          destination.zone == AppConstants.typeGeneral) {
         params = {
           'start': start,
           'destination': destination,
@@ -65,24 +67,40 @@ class NavMeshSystem {
           'factory': _factories[startFloor],
         };
       } else {
-        List<Destination> connectors = obtainConnectorsInSameFloor(
+        Destination? connector = _obtainConvinientConnector(
           startFloor,
-          start.zone,
+          start,
           destinationFloor,
+          useElevator,
         );
-        if (connectors.isEmpty) {
+        if (connector == null) {
           return [];
-        } else {
-          Destination connector = _obtainNearestConnector(start, connectors);
-          params = {
-            'start': start,
-            'destination': connector,
-            'graph': _graphs[startFloor],
-            'polygon': _polygons[startFloor],
-            'factory': _factories[startFloor],
-          };
         }
+        params = {
+          'start': start,
+          'destination': connector,
+          'graph': _graphs[startFloor],
+          'polygon': _polygons[startFloor],
+          'factory': _factories[startFloor],
+        };
       }
+    } else {
+      Destination? connector = _obtainConvinientConnector(
+        startFloor,
+        start,
+        destinationFloor,
+        useElevator,
+      );
+      if (connector == null) {
+        return [];
+      }
+      params = {
+        'start': start,
+        'destination': connector,
+        'graph': _graphs[startFloor],
+        'polygon': _polygons[startFloor],
+        'factory': _factories[startFloor],
+      };
     }
     return compute(_solveRoute, params);
   }
@@ -99,10 +117,11 @@ class NavMeshSystem {
     return floors;
   }
 
-  List<Destination> obtainConnectorsInSameFloor(
+  List<Destination> _obtainConnectorsInSameFloor(
     int floor,
     String zone,
     int destinationFloor,
+    bool? useElevator,
   ) {
     return _allDestinations
         .where(
@@ -110,7 +129,11 @@ class NavMeshSystem {
               d.isConnector &&
               d.floor == floor &&
               d.zone == zone &&
-              d.connectedFloors.contains(destinationFloor),
+              d.connectedFloors.contains(destinationFloor) &&
+              (useElevator == null ||
+                  (d.type == AppConstants.typeElevator && useElevator)) &&
+              (useElevator == null ||
+                  (d.type == AppConstants.typeStairs && !useElevator)),
         )
         .toList();
   }
@@ -129,6 +152,41 @@ class NavMeshSystem {
       }
     }
     return nearestConnector;
+  }
+
+  Destination? _obtainConvinientConnector(
+    int startFloor,
+    Destination start,
+    int destinationFloor,
+    bool? useElevator,
+  ) {
+    List<Destination> connectors = _obtainConnectorsInSameFloor(
+      startFloor,
+      start.zone,
+      destinationFloor,
+      useElevator,
+    );
+    if (connectors.isEmpty) {
+      return null;
+    } else {
+      return _obtainNearestConnector(start, connectors);
+    }
+  }
+
+  Destination? obtainNearestDestinationToClick(
+    List<Destination> destinations,
+    jts.Coordinate point,
+  ) {
+    Destination nearestDestination = destinations[0];
+    double minDistance = double.infinity;
+    for (Destination destination in destinations) {
+      double distance = point.distance(destination.coordinate);
+      if (distance < minDistance) {
+        nearestDestination = destination;
+        minDistance = distance;
+      }
+    }
+    return nearestDestination;
   }
 
   // Función pública para ajustar una coordenada al polígono válido más cercano
@@ -232,5 +290,25 @@ List<jts.Coordinate> _solveRoute(Map<String, dynamic> params) {
   connectPoint(startCoord);
   connectPoint(destinationCoord);
 
-  return pathFinder.computeRoute(startCoord, destinationCoord, tempGraph);
+  List<jts.Coordinate> route = pathFinder.computeRoute(
+    startCoord,
+    destinationCoord,
+    tempGraph,
+  );
+
+  List<jts.Coordinate> optimizeRoute(List<jts.Coordinate> route) {
+    List<jts.Coordinate> optimizedRoute = [];
+    optimizedRoute.add(route[0]);
+    int pivot = 0;
+    for (int i = pivot + 2; i < route.length; i++) {
+      if (!isVisible(route[pivot], route[i])) {
+        optimizedRoute.add(route[i - 1]);
+        pivot = i - 1;
+      }
+    }
+    optimizedRoute.add(route[route.length - 1]);
+    return optimizedRoute;
+  }
+
+  return optimizeRoute(route);
 }
