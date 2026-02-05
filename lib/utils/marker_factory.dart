@@ -83,7 +83,7 @@ class MarkerFactory {
             alignment: Alignment.center,
             child: Text(
               destination.name,
-              style: TextStyle(fontSize: 10, color: Colors.grey),
+              style: TextStyle(fontSize: 10, color: Colors.grey[900]),
             ),
           ),
           width: 150.0,

@@ -15,8 +15,8 @@ class MapLayers extends StatefulWidget {
   final Function(LatLng) onLongPress;
 
   static final LatLngBounds bounds = LatLngBounds(
-    LatLng(42.613725, -5.561775),
-    LatLng(42.614722, -5.560413),
+    LatLng(42.613882, -5.561787),
+    LatLng(42.614592, -5.560516),
   );
 
   const MapLayers({
@@ -88,7 +88,6 @@ class _MapLayersState extends State<MapLayers> {
                 'assets/images/Planta_${widget.floor}_final.png',
               ),
               bounds: MapLayers.bounds,
-              opacity: 0.7,
             ),
           ],
         ),
