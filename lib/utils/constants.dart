@@ -9,6 +9,7 @@ abstract class AppConstants {
   static const String typeRestauration = 'restauracion';
   static const String typeElevator = 'ascensor';
   static const String typeStairs = 'escalera';
+  static const String typeLibrary = 'biblioteca';
   static const String typeGPS = 'gps';
 
   static const String typeMapSelection = 'MAP_SELECTION';

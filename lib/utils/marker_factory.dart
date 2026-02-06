@@ -65,6 +65,16 @@ class MarkerFactory {
             ),
           );
           break;
+        case AppConstants.typeLibrary:
+          markers.add(
+            Marker(
+              point: point,
+              child: Icon(Icons.menu_book_rounded),
+              rotate: true,
+            ),
+          );
+          break;
+
         default:
           break;
       }

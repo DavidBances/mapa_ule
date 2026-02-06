@@ -464,6 +464,12 @@ class _MapViewState extends State<MapView> {
   void _onFloorChanged(int floor) {
     setState(() {
       _currentFloor = floor;
+      _poiMarkers = MarkerFactory.processPoiMarkers(
+        _destinations.where((d) => d.floor == _currentFloor).toList(),
+      );
+      _labelMarkers = MarkerFactory.processLabelMarkers(
+        _destinations.where((d) => d.floor == _currentFloor).toList(),
+      );
     });
     if (_onRoute) {
       Destination? startRouteConnector = _connectors.firstWhereOrNull(
