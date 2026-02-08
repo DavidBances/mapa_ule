@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:dart_jts/dart_jts.dart' as jts;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -67,7 +68,7 @@ class NavMeshSystem {
           'factory': _factories[startFloor],
         };
       } else {
-        Destination? connector = _obtainConvinientConnector(
+        Destination? connector = obtainConvinientConnector(
           startFloor,
           start,
           destinationFloor,
@@ -85,7 +86,7 @@ class NavMeshSystem {
         };
       }
     } else {
-      Destination? connector = _obtainConvinientConnector(
+      Destination? connector = obtainConvinientConnector(
         startFloor,
         start,
         destinationFloor,
@@ -130,9 +131,8 @@ class NavMeshSystem {
               d.floor == floor &&
               d.zone == zone &&
               d.connectedFloors.contains(destinationFloor) &&
-              (useElevator == null ||
-                  (d.type == AppConstants.typeElevator && useElevator)) &&
-              (useElevator == null ||
+              ((useElevator == null ||
+                      (d.type == AppConstants.typeElevator && useElevator)) ||
                   (d.type == AppConstants.typeStairs && !useElevator)),
         )
         .toList();
@@ -154,7 +154,7 @@ class NavMeshSystem {
     return nearestConnector;
   }
 
-  Destination? _obtainConvinientConnector(
+  Destination? obtainConvinientConnector(
     int startFloor,
     Destination start,
     int destinationFloor,
@@ -167,10 +167,45 @@ class NavMeshSystem {
       useElevator,
     );
     if (connectors.isEmpty) {
-      return null;
+      return _findHubConnector(startFloor, destinationFloor, start);
     } else {
       return _obtainNearestConnector(start, connectors);
     }
+  }
+
+  Destination? _findHubConnector(
+    int startFloor,
+    int destinationFloor,
+    Destination startPoint,
+  ) {
+    Set<int> possibleStartFloors = {};
+    Set<int> possibleDestinationFloors = {};
+
+    var possibleStartConnectors = obtainConnectors().where(
+      (d) => d.floor == startFloor,
+    );
+    var possibleDestinationConnectors = obtainConnectors().where(
+      (d) => d.floor == destinationFloor,
+    );
+
+    for (Destination connector in possibleStartConnectors) {
+      for (var d in connector.connectedFloors) {
+        possibleStartFloors.add(d);
+      }
+    }
+    for (Destination connector in possibleDestinationConnectors) {
+      for (var d in connector.connectedFloors) {
+        possibleDestinationFloors.add(d);
+      }
+    }
+    var hubFloor = possibleStartFloors.firstWhereOrNull(
+      (d) => possibleDestinationFloors.contains(d),
+    );
+    if (hubFloor == null) return null;
+    List<Destination> hubConnectors = possibleStartConnectors
+        .where((c) => c.connectedFloors.contains(hubFloor))
+        .toList();
+    return _obtainNearestConnector(startPoint, hubConnectors);
   }
 
   Destination? obtainNearestDestinationToClick(

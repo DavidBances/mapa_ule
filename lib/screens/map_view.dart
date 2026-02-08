@@ -1,18 +1,13 @@
-import 'package:collection/collection.dart';
-import 'package:dart_jts/dart_jts.dart' as jts;
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:mapa_ule/logic/location_service.dart';
-import 'package:mapa_ule/models/destination.dart';
+import 'package:mapa_ule/providers/map_notifier.dart';
 import 'package:mapa_ule/utils/constants.dart';
 import 'package:mapa_ule/utils/map_utils.dart';
-import 'package:mapa_ule/logic/nav_mesh_system.dart';
-import 'package:mapa_ule/utils/marker_factory.dart';
 import 'package:mapa_ule/widgets/animators/bottom_card_animator.dart';
 import 'package:mapa_ule/widgets/dialogs/arrival_dialog.dart';
 import 'package:mapa_ule/widgets/dialogs/cancel_trip_dialog.dart';
-import 'package:mapa_ule/widgets/floor_selector.dart';
+import 'package:mapa_ule/widgets/map_controls/floor_selector.dart';
 import 'package:mapa_ule/widgets/location_info_card.dart';
 import 'package:mapa_ule/widgets/map_layers.dart';
 import 'package:mapa_ule/widgets/map_search_bar.dart';
@@ -20,43 +15,23 @@ import 'package:mapa_ule/widgets/navigation_card.dart';
 import 'package:mapa_ule/widgets/route_planner_inputs.dart';
 import 'package:mapa_ule/widgets/route_preview_card.dart';
 import 'package:confetti/confetti.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MapView extends StatefulWidget {
+class MapView extends ConsumerStatefulWidget {
   const MapView({super.key});
 
   @override
-  State<MapView> createState() => _MapViewState();
+  ConsumerState<MapView> createState() => _MapViewState();
 }
 
-class _MapViewState extends State<MapView> {
-  final _navMeshSystem = NavMeshSystem();
-  bool _isLoading = true;
-  Destination? _start;
-  Destination? _destination;
-  Destination? _plannerStart;
-  Destination? _selectedDestination;
-  List<jts.Coordinate> _route = [];
-  List<Marker> _markers = [];
-  List<Marker> _poiMarkers = [];
-  List<Marker> _labelMarkers = [];
-  List<Destination> _destinations = [];
-  List<Destination> _connectors = [];
-  List<int> _floors = [];
-  int _distance = 0;
-  int _time = 0;
-  int _currentFloor = 0;
-  bool _onRoute = false;
-  bool _isPlanningMode = false;
-  bool _useElevator = false;
-
-  final LocationService _locationService = LocationService();
+class _MapViewState extends ConsumerState<MapView> {
   final MapController _mapController = MapController();
   ConfettiController _confettiControler = ConfettiController();
 
   @override
   void initState() {
     super.initState();
-    _chargeData();
+    ref.read(mapProvider.notifier).chargeData();
     _confettiControler = ConfettiController(duration: Duration(seconds: 3));
   }
 
@@ -66,26 +41,35 @@ class _MapViewState extends State<MapView> {
     _confettiControler.dispose();
   }
 
-  Future<void> _chargeData() async {
-    await _navMeshSystem.initialize();
-    _destinations = _navMeshSystem.obtainDestinations();
-    _connectors = _navMeshSystem.obtainConnectors();
-    _poiMarkers = MarkerFactory.processPoiMarkers(
-      _destinations.where((d) => d.floor == _currentFloor).toList(),
-    );
-    _labelMarkers = MarkerFactory.processLabelMarkers(
-      _destinations.where((d) => d.floor == _currentFloor).toList(),
-    );
-    _floors = _navMeshSystem.obtainNumberOfFloors();
-    setState(() {
-      _isLoading = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final mapState = ref.watch(mapProvider);
+
+    ref.listen(mapProvider, (previous, next) {
+      if (next.errorMessage.isNotEmpty &&
+          next.errorMessage != previous!.errorMessage) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(next.errorMessage)));
+        mapState.errorMessage = '';
+      }
+
+      if (next.route.isNotEmpty && next.route != previous!.route) {
+        _centerCameraOnRoute();
+      }
+
+      if (next.start != previous?.start &&
+          next.start?.type == AppConstants.typeGPS) {
+        LatLng myLocation = LatLng(
+          next.start!.coordinate.y,
+          next.start!.coordinate.x,
+        );
+        _mapController.move(myLocation, 18.0);
+      }
+    });
+
     return Scaffold(
-      body: _isLoading
+      body: mapState.isLoading
           ? Center(child: CircularProgressIndicator())
           : _mapView(),
     );
@@ -99,16 +83,30 @@ class _MapViewState extends State<MapView> {
     return Stack(
       children: [
         MapLayers(
-          markers: _markers,
-          poiMarkers: _onRoute ? [] : _poiMarkers,
-          labelMarkers: _labelMarkers,
-          route: _route,
+          markers: ref.watch(mapProvider).markers,
+          poiMarkers: ref.watch(mapProvider).onRoute
+              ? []
+              : ref.watch(mapProvider).poiMarkers,
+          labelMarkers: ref.watch(mapProvider).labelMarkers,
+          route: ref.watch(mapProvider).route,
           mapController: _mapController,
-          floor: _currentFloor,
-          onClick: _onNormalTap,
-          onLongPress: _onLongPress,
+          floor: ref.watch(mapProvider).currentFloor,
+          onClick: (point) => ref.read(mapProvider.notifier).onNormalTap(point),
+          onLongPress: (point) =>
+              ref.read(mapProvider.notifier).onLongPress(point),
         ),
-        Positioned(top: 0, left: 0, right: 0, child: _buildTopControls()),
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Column(
+            children: [
+              _buildTopControls(),
+              SizedBox(height: 10),
+              _buildFloorSelector(),
+            ],
+          ),
+        ),
         Positioned(
           bottom: 10,
           left: 0,
@@ -120,58 +118,50 @@ class _MapViewState extends State<MapView> {
     );
   }
 
+  Row _buildFloorSelector() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: FloorSelector(
+            floors: ref.watch(mapProvider).floors,
+            currentFloor: ref.watch(mapProvider).currentFloor,
+            onFloorChanged: (floor) =>
+                ref.read(mapProvider.notifier).onFloorChanged(floor),
+          ),
+        ),
+      ],
+    );
+  }
+
   SafeArea _buildTopControls() {
-    if (_isPlanningMode &&
-        (_selectedDestination != null || _plannerStart != null)) {
+    if (ref.watch(mapProvider).isPlanningMode &&
+        (ref.watch(mapProvider).selectedDestination != null ||
+            ref.watch(mapProvider).plannerStart != null)) {
       return SafeArea(
         child: RoutePlannerInputs(
-          destination: _selectedDestination,
-          start: _plannerStart,
-          onSwapPressed: _swapPoints,
-          destinations: _destinations,
-          onStartChanged: (Destination? point) {
-            setState(() {
-              _plannerStart = point;
-              _markers = MarkerFactory.updateMarkers(
-                _plannerStart,
-                _selectedDestination,
-              );
-              _previewRoute();
-            });
-          },
-          onDestChanged: (Destination point) {
-            setState(() {
-              _selectedDestination = point;
-              _markers = MarkerFactory.updateMarkers(
-                _plannerStart,
-                _selectedDestination,
-              );
-              _previewRoute();
-            });
-          },
+          destination: ref.watch(mapProvider).selectedDestination,
+          start: ref.watch(mapProvider).plannerStart,
+          onSwapPressed: ref.read(mapProvider.notifier).swapPoints,
+          destinations: ref.watch(mapProvider).destinations,
+          onStartChanged: (point) =>
+              ref.read(mapProvider.notifier).setPlannerStart(point),
+          onDestChanged: (point) =>
+              ref.read(mapProvider.notifier).setSelectedDestination(point),
         ),
       );
     } else {
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10.0),
-          child: _onRoute
+          child: ref.watch(mapProvider).onRoute
               ? SizedBox.shrink()
-              : Row(
-                  children: [
-                    Expanded(
-                      child: MapSearchBar(
-                        destinations: _destinations,
-                        onSearch: _selectDestinationFromSearch,
-                      ),
-                    ),
-                    SizedBox(width: 10.0),
-                    FloorSelector(
-                      floors: _floors,
-                      currentFloor: _currentFloor,
-                      onFloorChanged: _onFloorChanged,
-                    ),
-                  ],
+              : MapSearchBar(
+                  destinations: ref.watch(mapProvider).destinations,
+                  onSearch: (point) => ref
+                      .read(mapProvider.notifier)
+                      .selectDestinationFromSearch(point),
                 ),
         ),
       );
@@ -187,51 +177,50 @@ class _MapViewState extends State<MapView> {
           Padding(
             padding: const EdgeInsets.only(right: 20.0),
             child: FloatingActionButton(
-              onPressed: _useMyLocation,
+              onPressed: ref.read(mapProvider.notifier).useMyLocation,
               child: Icon(Icons.my_location),
             ),
           ),
           SizedBox(height: 10.0),
-          if (_onRoute && _route.isNotEmpty) ...{
+          if (ref.watch(mapProvider).onRoute &&
+              ref.watch(mapProvider).route.isNotEmpty) ...{
             BottomCardAnimator(
               child: NavigationCard(
-                distance: _distance,
-                time: _time,
+                distance: ref.watch(mapProvider).distance,
+                time: ref.watch(mapProvider).time,
                 onFinished: _setNavigationFinished,
                 onCancel: _showCancelDialog,
-                onNextFloor: _onFloorChanged,
-                nextFloorNumber: null,
+                onNextFloor: (floor) =>
+                    ref.read(mapProvider.notifier).onFloorChanged(floor),
+                nextFloorNumber:
+                    (ref.watch(mapProvider).destination != null &&
+                        ref.watch(mapProvider).currentFloor !=
+                            ref.watch(mapProvider).destination!.floor)
+                    ? ref.watch(mapProvider).destination!.floor
+                    : null,
               ),
             ),
-          } else if (_isPlanningMode) ...{
+          } else if (ref.watch(mapProvider).isPlanningMode) ...{
             BottomCardAnimator(
               child: RoutePreviewCard(
-                plannerStart: _plannerStart,
-                selectedDestination: _selectedDestination,
-                distance: _distance,
-                time: _time,
+                plannerStart: ref.watch(mapProvider).plannerStart,
+                selectedDestination: ref.watch(mapProvider).selectedDestination,
+                distance: ref.watch(mapProvider).distance,
+                time: ref.watch(mapProvider).time,
                 isSameFloor:
-                    _plannerStart?.floor == _selectedDestination?.floor,
-                onNavigationStart: _startNavigation,
-                onWaySelected: _selectMovilityWay,
-                isElevatorSelected: _useElevator,
-                onClose: () {
-                  _resetNavigation();
-                },
+                    ref.watch(mapProvider).plannerStart?.floor ==
+                    ref.watch(mapProvider).selectedDestination?.floor,
+                onNavigationStart: ref
+                    .read(mapProvider.notifier)
+                    .startNavigation,
+                onWaySelected: ref.read(mapProvider.notifier).selectMovilityWay,
+                isElevatorSelected: ref.watch(mapProvider).useElevator,
+                onClose: ref.read(mapProvider.notifier).resetNavigation,
               ),
             ),
-          } else if (_selectedDestination != null && !_onRoute) ...{
-            BottomCardAnimator(
-              child: LocationInfoCard(
-                title: _selectedDestination!.name,
-                subtitle:
-                    'Lat: ${_selectedDestination!.coordinate.y.toStringAsFixed(5)}, Lng: ${_selectedDestination!.coordinate.x.toStringAsFixed(5)}',
-                onGoPressed: _activatePlanningMode,
-                onClosePressed: () {
-                  _resetNavigation();
-                },
-              ),
-            ),
+          } else if (ref.watch(mapProvider).selectedDestination != null &&
+              !ref.watch(mapProvider).onRoute) ...{
+            BottomCardAnimator(child: LocationInfoCard()),
           } else ...{
             BottomCardAnimator(child: SizedBox.shrink()),
           },
@@ -255,292 +244,25 @@ class _MapViewState extends State<MapView> {
   //MAP INTERACTIONS
   //======================================
 
-  void _onNormalTap(LatLng point) {
-    var coord = jts.Coordinate(point.longitude, point.latitude);
-    var nearestDestination = _navMeshSystem.obtainNearestDestinationToClick(
-      _destinations.where((d) => d.floor == _currentFloor).toList(),
-      coord,
-    );
-    if (nearestDestination != null &&
-        nearestDestination.coordinate.distance(coord) < 0.00004) {
-      _selectPoint(nearestDestination);
-    }
-  }
-
-  void _onLongPress(LatLng point) {
-    var coord = jts.Coordinate(point.longitude, point.latitude);
-    _computeClick(coord);
-  }
-
-  void _computeClick(jts.Coordinate point) {
-    var snappedCoord = _navMeshSystem.getSnappedPoint(point, _currentFloor);
-    var destinationHelper = Destination(
-      coordinate: snappedCoord,
-      floor: _currentFloor,
-    );
-
-    _selectPoint(destinationHelper);
-  }
-
-  void _selectPoint(Destination destinationHelper) {
-    if (_isPlanningMode) {
-      setState(() {
-        _plannerStart == null
-            ? _plannerStart = destinationHelper
-            : _selectedDestination = destinationHelper;
-        _markers = MarkerFactory.updateMarkers(
-          _plannerStart,
-          _selectedDestination,
-        );
-        _previewRoute();
-      });
-    } else {
-      if (_destination == null) {
-        setState(() {
-          _selectedDestination = destinationHelper;
-          _markers = MarkerFactory.updateMarkers(null, _selectedDestination);
-        });
-      }
-    }
-  }
-
-  //======================================
-  //ROUTE LOGIC AND NAVIGATION
-  //======================================
-
-  void _startNavigation() {
-    if (_plannerStart == null || _selectedDestination == null) return;
-    setState(() {
-      _onRoute = true;
-      _isPlanningMode = false;
-      _route = [];
-    });
-    _setStartPoint(
-      LatLng(_plannerStart!.coordinate.y, _plannerStart!.coordinate.x),
-    );
-    _setDestinationPoint(
-      LatLng(
-        _selectedDestination!.coordinate.y,
-        _selectedDestination!.coordinate.x,
-      ),
-    );
-    _setRoute(_start!, _destination!);
-    setState(() {
-      _isPlanningMode = false;
-    });
-  }
-
-  Future<void> _setRoute(Destination start, Destination destination) async {
-    var calculatedRoute = await _navMeshSystem.obtainRoute(
-      start,
-      destination,
-      null,
-    );
-    if (calculatedRoute.isEmpty) {
-      _resetNavigation();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "No se pudo encontrar una ruta válida desde este punto.",
-            ),
-          ),
-        );
-      }
-      return;
-    }
-
-    setState(() {
-      _route = calculatedRoute;
-      _distance = MapUtils.calculateDistance(_route);
-      _time = MapUtils.calculateTime(_distance);
-      _centerCameraOnRoute();
-      _onRoute = true;
-    });
-  }
-
-  void _resetNavigation() {
-    setState(() {
-      _start = null;
-      _plannerStart = null;
-      _destination = null;
-      _selectedDestination = null;
-      _route = [];
-      _markers = MarkerFactory.updateMarkers(null, null);
-      _onRoute = false;
-      _isPlanningMode = false;
-      _distance = 0;
-      _time = 0;
-      _useElevator = false;
-    });
-  }
-
-  Future<void> _previewRoute() async {
-    if (_plannerStart == null || _selectedDestination == null) {
-      setState(() {
-        _route = [];
-        _distance = 0;
-        _time = 0;
-      });
-      return;
-    }
-    var calculatedRoute = await _navMeshSystem.obtainRoute(
-      _plannerStart!,
-      _selectedDestination!,
-      _useElevator,
-    );
-    setState(() {
-      _route = calculatedRoute;
-      _distance = MapUtils.calculateDistance(_route);
-      _time = MapUtils.calculateTime(_distance);
-      _markers = MarkerFactory.updateMarkers(
-        _plannerStart,
-        _selectedDestination,
-      );
-    });
-  }
-
   void _centerCameraOnRoute() {
-    if (_route.isNotEmpty) {
+    if (ref.watch(mapProvider).route.isNotEmpty) {
       _mapController.fitCamera(
         CameraFit.bounds(
-          bounds: MapUtils.getRouteBounds(_route),
+          bounds: MapUtils.getRouteBounds(ref.watch(mapProvider).route),
           padding: EdgeInsets.only(
             top: 200.0,
             bottom: 200.0,
-            left: 50,
-            right: 50,
+            left: 100,
+            right: 100,
           ),
         ),
       );
     }
-  }
-
-  void _setStartPoint(LatLng point) {
-    setState(() {
-      _start = Destination(
-        coordinate: jts.Coordinate(point.longitude, point.latitude),
-        zone:
-            _destinations
-                .where((d) => d.floor == _currentFloor)
-                .toList()
-                .isEmpty
-            ? AppConstants.typeGeneral
-            : MapUtils.nearestDestinationToClick(
-                _destinations.where((d) => d.floor == _currentFloor).toList(),
-                point,
-              ).zone,
-        floor: _currentFloor,
-      );
-      _markers = MarkerFactory.updateMarkers(_start, _destination);
-    });
-  }
-
-  void _setDestinationPoint(LatLng point) {
-    setState(() {
-      _destination = Destination(
-        coordinate: jts.Coordinate(point.longitude, point.latitude),
-        floor: _currentFloor,
-        zone:
-            _destinations
-                .where((d) => d.floor == _currentFloor)
-                .toList()
-                .isEmpty
-            ? AppConstants.typeGeneral
-            : MapUtils.nearestDestinationToClick(
-                _destinations.where((d) => d.floor == _currentFloor).toList(),
-                point,
-              ).zone,
-        connectedFloors: [],
-      );
-      _markers = MarkerFactory.updateMarkers(_start, _destination);
-    });
   }
 
   //======================================
   //CALLBACKS
   //======================================
-
-  void _onFloorChanged(int floor) {
-    setState(() {
-      _currentFloor = floor;
-      _poiMarkers = MarkerFactory.processPoiMarkers(
-        _destinations.where((d) => d.floor == _currentFloor).toList(),
-      );
-      _labelMarkers = MarkerFactory.processLabelMarkers(
-        _destinations.where((d) => d.floor == _currentFloor).toList(),
-      );
-    });
-    if (_onRoute) {
-      Destination? startRouteConnector = _connectors.firstWhereOrNull(
-        (c) => c.coordinate.distance(_route.last) < 0.0000001,
-      );
-      if (startRouteConnector == null) return;
-      Destination? destinationRouteConnector = _connectors.firstWhereOrNull(
-        (c) => c.floor == floor && c.name == startRouteConnector.name,
-      );
-      if (destinationRouteConnector == null) return;
-      setState(() {
-        _route = [];
-        _start = destinationRouteConnector;
-        _markers = MarkerFactory.updateMarkers(_start, _destination!);
-      });
-      _setRoute(destinationRouteConnector, _destination!);
-    }
-  }
-
-  void _selectDestinationFromSearch(Destination point) {
-    setState(() {
-      _selectedDestination = point;
-      _markers = MarkerFactory.updateMarkers(
-        _plannerStart,
-        _selectedDestination,
-      );
-    });
-    if (_start != null) {
-      setState(() {
-        _destination = _selectedDestination;
-      });
-      _setRoute(_start!, _destination!);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "📍 Destino fijado. Ahora toca el mapa para indicar dónde estás.",
-          ),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
-  void _swapPoints() {
-    setState(() {
-      var temp = _plannerStart;
-      _plannerStart = _selectedDestination;
-      _selectedDestination = temp;
-      _markers = MarkerFactory.updateMarkers(
-        _plannerStart,
-        _selectedDestination,
-      );
-      _previewRoute();
-    });
-  }
-
-  void _activatePlanningMode() {
-    setState(() {
-      _isPlanningMode = true;
-      _plannerStart = null;
-      _previewRoute();
-    });
-  }
-
-  void _selectMovilityWay() {
-    setState(() {
-      _useElevator = !_useElevator;
-      _previewRoute();
-    });
-  }
 
   Future<void> _setNavigationFinished() async {
     await showDialog(
@@ -548,45 +270,13 @@ class _MapViewState extends State<MapView> {
       builder: (context) => ArrivalDialog(
         onConfirm: () {
           _confettiControler.play();
-          _resetNavigation();
+          ref.read(mapProvider.notifier).resetNavigation();
         },
       ),
     );
   }
 
   void _showCancelDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => CancelTripDialog(onConfirm: _resetNavigation),
-    );
-  }
-
-  //======================================
-  //EXTERNAL SERVICES
-  //======================================
-
-  void _useMyLocation() async {
-    try {
-      LatLng myLocation = await _locationService.getCurrentLocation();
-      _mapController.move(myLocation, 18.0);
-      setState(() {
-        _start = Destination(
-          name: AppConstants.myLocationName,
-          coordinate: jts.Coordinate(myLocation.longitude, myLocation.latitude),
-          floor: 0,
-          type: AppConstants.typeGPS,
-          zone: AppConstants.typeGeneral,
-          connectedFloors: [],
-        );
-        _markers = MarkerFactory.updateMarkers(_start, _destination);
-      });
-    } catch (ex) {
-      if (mounted) {
-        String msg = ex.toString().replaceAll("Exception: ", "");
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(msg)));
-      }
-    }
+    showDialog(context: context, builder: (_) => CancelTripDialog());
   }
 }

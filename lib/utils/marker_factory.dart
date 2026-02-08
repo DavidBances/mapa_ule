@@ -8,9 +8,10 @@ class MarkerFactory {
   static List<Marker> updateMarkers(
     Destination? start,
     Destination? destination,
+    int currentFloor,
   ) {
     return [
-      if (start != null)
+      if (start != null && start.floor == currentFloor)
         Marker(
           key: const ValueKey('start'),
           point: LatLng(start.coordinate.y, start.coordinate.x),
@@ -19,11 +20,13 @@ class MarkerFactory {
           height: 40,
           rotate: true,
         ),
-      if (destination != null)
+      if (destination != null && destination.floor == currentFloor)
         Marker(
           key: const ValueKey('dest'),
           point: LatLng(destination.coordinate.y, destination.coordinate.x),
-          child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+          child: destination.isConnector
+              ? const Icon(Icons.flag_rounded, color: Colors.yellow, size: 40)
+              : const Icon(Icons.location_pin, color: Colors.red, size: 40),
           alignment: Alignment.topCenter,
           width: 40,
           height: 40,

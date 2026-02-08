@@ -37,6 +37,19 @@ class MapLayers extends StatefulWidget {
 
 class _MapLayersState extends State<MapLayers> {
   List<Marker> labelMarkersList = [];
+
+  @override
+  void didUpdateWidget(covariant MapLayers oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.floor != widget.floor) {
+      setState(() {
+        widget.mapController.camera.zoom > 19.0
+            ? labelMarkersList = widget.labelMarkers
+            : labelMarkersList = [];
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return drawMap();
@@ -91,8 +104,12 @@ class _MapLayersState extends State<MapLayers> {
             ),
           ],
         ),
-        PolylineLayer(polylines: MapUtils.getRoutePolylines(widget.route)),
+        PolylineLayer(
+          key: Key("map_floor_${widget.floor}"),
+          polylines: MapUtils.getRoutePolylines(widget.route),
+        ),
         MarkerLayer(
+          key: Key("map_floor_${widget.floor}"),
           markers: widget.route.isEmpty
               ? [...widget.poiMarkers, ...widget.markers, ...labelMarkersList]
               : [...widget.markers, ...labelMarkersList],

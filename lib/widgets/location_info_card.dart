@@ -1,25 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapa_ule/providers/map_notifier.dart';
 
-class LocationInfoCard extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback onGoPressed;
-  final VoidCallback onClosePressed;
-
-  const LocationInfoCard({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    required this.onGoPressed,
-    required this.onClosePressed,
-  });
+class LocationInfoCard extends ConsumerWidget {
+  const LocationInfoCard({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return drawLocationInfoCard();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return drawLocationInfoCard(ref);
   }
 
-  Card drawLocationInfoCard() {
+  Widget drawLocationInfoCard(WidgetRef ref) {
+    if (ref.watch(mapProvider).selectedDestination == null) {
+      return SizedBox.shrink();
+    }
     return Card(
       color: Colors.white,
       shadowColor: Colors.black,
@@ -34,7 +28,7 @@ class LocationInfoCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    title,
+                    ref.watch(mapProvider).selectedDestination!.name,
                     style: TextStyle(
                       fontSize: 20.0,
                       fontWeight: FontWeight.bold,
@@ -43,13 +37,13 @@ class LocationInfoCard extends StatelessWidget {
                 ),
                 IconButton(
                   icon: Icon(Icons.close_rounded, color: Colors.redAccent[700]),
-                  onPressed: onClosePressed,
+                  onPressed: ref.read(mapProvider.notifier).resetNavigation,
                 ),
               ],
             ),
             SizedBox(height: 10.0),
             Text(
-              subtitle,
+              'Lat: ${ref.watch(mapProvider).selectedDestination!.coordinate.y.toStringAsFixed(5)}, Lng: ${ref.watch(mapProvider).selectedDestination!.coordinate.x.toStringAsFixed(5)}',
               style: TextStyle(fontSize: 14.0, fontWeight: FontWeight.w600),
             ),
             SizedBox(height: 10.0),
@@ -61,7 +55,7 @@ class LocationInfoCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10.0),
                 ),
               ),
-              onPressed: onGoPressed,
+              onPressed: ref.read(mapProvider.notifier).activatePlanningMode,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [

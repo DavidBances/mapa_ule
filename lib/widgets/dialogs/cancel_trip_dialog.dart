@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mapa_ule/providers/map_notifier.dart';
 
-class CancelTripDialog extends StatelessWidget {
-  final VoidCallback onConfirm;
-
-  const CancelTripDialog({super.key, required this.onConfirm});
+class CancelTripDialog extends ConsumerWidget {
+  const CancelTripDialog({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return drawCancelRouteDialog(context);
+  Widget build(BuildContext context, WidgetRef ref) {
+    return drawCancelRouteDialog(context, ref);
   }
 
-  Dialog drawCancelRouteDialog(BuildContext context) {
+  Dialog drawCancelRouteDialog(BuildContext context, WidgetRef ref) {
     return Dialog(
       child: Container(
         padding: EdgeInsets.all(16.0),
@@ -31,7 +31,7 @@ class CancelTripDialog extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: () {
-                    onConfirm();
+                    ref.read(mapProvider.notifier).resetNavigation();
                     Navigator.pop(context);
                   },
                   child: Text("SI"),

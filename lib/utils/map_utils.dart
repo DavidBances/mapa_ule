@@ -1,8 +1,10 @@
+import 'package:collection/collection.dart';
 import 'package:dart_jts/dart_jts.dart' as jts;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:mapa_ule/models/destination.dart';
+import 'package:mapa_ule/utils/constants.dart';
 
 class MapUtils {
   static int calculateDistance(List<jts.Coordinate> route) {
@@ -69,5 +71,62 @@ class MapUtils {
       }
     }
     return nearestDestination;
+  }
+
+  static Destination? findTwinConnector(
+    Destination tempStart,
+    Destination tempDestination,
+    List<Destination> connectors,
+    int currentFloor,
+    Destination? referenceConnector,
+  ) {
+    if (referenceConnector == null) return null;
+
+    var tempConnectors = connectors
+        .where((c) => c.floor == currentFloor)
+        .toList();
+
+    return tempConnectors.firstWhereOrNull(
+      (c) =>
+          (c.type == AppConstants.typeElevator &&
+              c.coordinate.distance(referenceConnector.coordinate) <
+                  0.0000001) ||
+          (c.type == AppConstants.typeStairs &&
+              c.name == referenceConnector.name),
+    );
+  }
+
+  static List<Destination>? calculateSegmentEndpoints(
+    Destination tempStart,
+    Destination tempDestination,
+    Destination twinConnector,
+    Destination? exitConnector,
+    int currentFloor,
+  ) {
+    if (currentFloor == tempDestination.floor) {
+      return [twinConnector, tempDestination];
+    } else if (currentFloor == tempStart.floor) {
+      return [tempStart, twinConnector];
+    } else {
+      if (exitConnector == null) return null;
+      return [twinConnector, exitConnector];
+    }
+  }
+
+  static List<Destination?>? getEffectiveEndpoints(
+    bool onRoute,
+    bool isPlanningMode,
+    Destination? start,
+    Destination? destination,
+    Destination? plannerStart,
+    Destination? selectedDestination,
+  ) {
+    if (onRoute) {
+      return [start, destination];
+    } else if (isPlanningMode) {
+      return [plannerStart, selectedDestination];
+    } else {
+      return null;
+    }
   }
 }
