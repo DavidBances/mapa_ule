@@ -1,16 +1,17 @@
-# mapa_ule
+# Mapa ULE (Ingenierías) 🗺️
 
-A new Flutter project.
+Aplicación de mapeo interactivo y enrutamiento diseñada específicamente para el ecosistema iOS, orientada a las facultades de Ingeniería de la Universidad de León (Industrial, Informática y Aeroespacial).
 
-## Getting Started
+## 🎯 Objetivo
+El campus universitario puede ser confuso. Mapa ULE proporciona una herramienta interactiva para que estudiantes y visitantes puedan localizar aulas, laboratorios y departamentos dentro de las facultades de ingeniería, generando rutas precisas para llegar a su destino.
 
-This project is a starting point for a Flutter application.
+## 🛠️ Tecnologías Utilizadas
+- **Framework**: Flutter (optimizado y enfocado al ecosistema iOS).
+- **Gestión de Estado**: Riverpod, asegurando una arquitectura escalable, reactiva y fácil de mantener.
+- **Lógica**: Implementación de algoritmos de cálculo de rutas y renderizado de mapas interactivos.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## ✨ Características Principales
+- Mapeo detallado de las facultades de Ingeniería.
+- Sistema de búsqueda de ubicaciones específicas (aulas, despachos).
+- Trazado de rutas desde un punto A hasta un punto B dentro del recinto.
+- Interfaz fluida y nativa gracias a la compilación de Flutter para iOS.
